@@ -2,7 +2,6 @@ import os
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 from peewee import *
-from utils import *
 import json
 import uuid 
 import numpy as np
@@ -118,27 +117,6 @@ def get_medicine_by_name(name):
     return jsonify({'status': 200, 'data': data})
 
 
-@app.route('/upload_image', methods=['POST'])
-def upload_image():
-    uploaded_file = request.files['image']
-    # filename = secure_filename(uploaded_file.filename)
-
-    if not allowed_file(uploaded_file.filename):
-        return {'status': 400, 'message': f'{uploaded_file.filename} not allowed'}
-
-    ext = os.path.splitext(uploaded_file.filename)[1]
-    filename = str(uuid.uuid4().hex) + ext
-    target_path = os.path.join(
-        app.config['UPLOAD_FOLDER'], filename)
-    
-    if uploaded_file.filename != '':
-        try:
-            uploaded_file.save(target_path)
-        except:
-            return {'status': 400, 'message': 'Failed to save the image'}
-    return target_path
-
-
 def find_roi(image_loc):
 
     #Creating argument dictionary for the default arguments needed in the code. 
@@ -229,19 +207,36 @@ def find_roi(image_loc):
     return (boxes, confidence_val, rW, rH, orig)
 
 
-@app.route('/predict', methods=['GET'])
+@app.route('/predict', methods=['POST'])
 def predict():
-    image_loc = request.form['image_loc']
-    image_loc = os.path.join(cwd, image_loc)
+    #upload image
+    uploaded_file = request.files['image']
+    # filename = secure_filename(uploaded_file.filename)
 
-    (boxes, confidence_val, rW, rH, orig) = find_roi(image_loc)
+    if not allowed_file(uploaded_file.filename):
+        return {'status': 400, 'message': f'{uploaded_file.filename} not allowed'}
+
+    ext = os.path.splitext(uploaded_file.filename)[1]
+    filename = str(uuid.uuid4().hex) + ext
+    target_path = os.path.join(
+        app.config['UPLOAD_FOLDER'], filename)
+    
+    if uploaded_file.filename != '':
+        try:
+            uploaded_file.save(target_path)
+        except:
+            return {'status': 400, 'message': 'Failed to save the image' + target_path}
+    # return jsonify({'data': target_path, 'status': 200})
+
+    #find Region of Interest
+    (boxes, confidence_val, rW, rH, orig) = find_roi(target_path)
     boxes = non_max_suppression(np.array(boxes), probs=confidence_val)
 
     ##Text Detection and Recognition 
 
     # initialize the list of results
     results = []
-
+    
     for (startX, startY, endX, endY) in boxes:
 	# scale the coordinates based on the respective ratios in order to reflect bounding box on the original image
         startX = int(startX * rW)
