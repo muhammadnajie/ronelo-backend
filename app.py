@@ -72,9 +72,16 @@ def hello_world():
     return "<p>Hello World!</p>"
 
 
-@app.route('/medicine', methods=['GET', 'POST'])
+@app.route('/medicine', methods=['GET'])
 def get_medicine():
-    medicines = Medicine.select().limit(20)
+    page = 1
+    if request.args.get('page'):
+        page = int(request.args.get('page'))
+
+
+    medicines = (Medicine.select()
+                         .order_by(Medicine.name)
+                         .paginate(page, 20))
     data = []
     for medicine in medicines:
         new_data = {
